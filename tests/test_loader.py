@@ -156,3 +156,121 @@ def test_load_skip_already_loaded_file():
         result = load_csv(path, "sales_rollup", source="test", session_factory=Session)
         assert result["rows_loaded"] == 0
         assert result["skipped_file"] is True
+
+
+# ── Data integrity tests ──
+
+
+def test_daily_item_parsed_values():
+    """Verify parsed values land correctly in the DB, not just row counts."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "daily_item.csv", DAILY_ITEM_CSV)
+        load_csv(path, "daily_item_export", source="test", session_factory=Session)
+
+        with Session() as s:
+            row = s.execute(
+                text("SELECT * FROM daily_item_export WHERE item_ref = '22248127354'")
+            ).fetchone()
+            assert row.device == "VK200044724"
+            assert row.location == "Oscar M Arenas"
+            assert row.city == "South Gate"
+            assert row.state == "CA"
+            assert row.zip == "90280"
+            assert row.item_type == "CREDIT (EMV CONTACTLESS)"
+            assert float(row.amount) == 2.50
+            assert row.slot_code == "0B06"
+            assert float(row.slot_price) == 2.50
+            assert row.quantity == 1
+            assert row.settle_status == "SETTLED"
+            assert row.card_id == "3268435804"
+            assert "2026" in str(row.item_date)
+            assert "05" in str(row.item_date) or "5" in str(row.item_date)
+
+
+def test_sales_rollup_parsed_values():
+    """Verify sales rollup amounts and counts parse correctly."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "sr.csv", SALES_ROLLUP_CSV)
+        load_csv(path, "sales_rollup", source="test", session_factory=Session)
+
+        with Session() as s:
+            row = s.execute(text("SELECT * FROM sales_rollup")).fetchone()
+            assert row.serial_num == "VK200044724"
+            assert row.trans_type == "Cash"
+            assert row.tran_count == 20
+            assert row.vend_count == 20
+            assert float(row.amount) == 45.00
+            assert row.currency_code == "USD"
+            assert float(row.two_tier_pricing) == 0.00
+
+
+def test_detailed_activity_parsed_values():
+    """Verify detailed activity date and amount parse correctly."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "da.csv", DETAILED_ACTIVITY_CSV)
+        load_csv(path, "detailed_activity", source="test", session_factory=Session)
+
+        with Session() as s:
+            row = s.execute(text("SELECT * FROM detailed_activity")).fetchone()
+            assert row.device == "VK200044724"
+            assert row.trans_type == "Credit (EMV Contactless)"
+            assert float(row.amount) == 18.00
+            assert "2026" in str(row.day)
+            assert "05-09" in str(row.day) or "5/9" in str(row.day)
+
+
+def test_report_loads_tracks_source():
+    """Verify report_loads records source correctly."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "daily_item.csv", DAILY_ITEM_CSV)
+        load_csv(path, "daily_item_export", source="playwright", session_factory=Session)
+
+        with Session() as s:
+            load = s.execute(text("SELECT * FROM report_loads")).fetchone()
+            assert load.source == "playwright"
+            assert load.source_file == "daily_item.csv"
+            assert load.report_type == "daily_item_export"
+            assert load.rows_loaded == 2
+
+
+def test_daily_item_dedup_across_files():
+    """Dedup works when same transactions appear in different files."""
+    Session = make_test_db()
+    file1 = '''"Device","Item Ref #","Customer Name","Location","Address Line 1","Address Line 2","City","State","Zip","Asset #","Item Type","Item Date","Card Number","Amount","Two-Tier Pricing","Column(s)","Quantity","Orig Ref #","Fee Rate","Settle Status","Payment #","Description","Card Id"
+"VK200044724","11111","Oscar M Arenas","Oscar M Arenas",,,"South Gate","CA","90280","TBD","CASH","05/07/2026 10:00:00 AM","","$2.00",,"0A01($2.00)",1,"","","SETTLED","","",""
+"VK200044724","22222","Oscar M Arenas","Oscar M Arenas",,,"South Gate","CA","90280","TBD","CASH","05/08/2026 10:00:00 AM","","$3.00",,"0A02($3.00)",1,"","","SETTLED","","",""
+'''
+    file2 = '''"Device","Item Ref #","Customer Name","Location","Address Line 1","Address Line 2","City","State","Zip","Asset #","Item Type","Item Date","Card Number","Amount","Two-Tier Pricing","Column(s)","Quantity","Orig Ref #","Fee Rate","Settle Status","Payment #","Description","Card Id"
+"VK200044724","22222","Oscar M Arenas","Oscar M Arenas",,,"South Gate","CA","90280","TBD","CASH","05/08/2026 10:00:00 AM","","$3.00",,"0A02($3.00)",1,"","","SETTLED","","",""
+"VK200044724","33333","Oscar M Arenas","Oscar M Arenas",,,"South Gate","CA","90280","TBD","CASH","05/09/2026 10:00:00 AM","","$4.00",,"0A03($4.00)",1,"","","SETTLED","","",""
+'''
+    with tempfile.TemporaryDirectory() as tmp:
+        path1 = write_csv(tmp, "export_day1.csv", file1)
+        path2 = write_csv(tmp, "export_day2.csv", file2)
+
+        r1 = load_csv(path1, "daily_item_export", source="test", session_factory=Session)
+        assert r1["rows_loaded"] == 2
+
+        r2 = load_csv(path2, "daily_item_export", source="test", session_factory=Session)
+        assert r2["rows_loaded"] == 1  # only 33333 is new
+        assert r2["skipped"] == 1      # 22222 already exists
+
+        with Session() as s:
+            total = s.execute(text("SELECT COUNT(*) FROM daily_item_export")).scalar()
+            assert total == 3
+
+
+def test_load_unknown_report_type():
+    """Unknown report type raises ValueError."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "test.csv", DAILY_ITEM_CSV)
+        try:
+            load_csv(path, "nonexistent_type", source="test", session_factory=Session)
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Unknown report type" in str(e)
