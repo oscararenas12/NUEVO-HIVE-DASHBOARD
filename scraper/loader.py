@@ -185,6 +185,90 @@ def _load_detailed_activity(db: SASession, rows: list[dict], load_id: int) -> in
     return loaded
 
 
+# ── Backfill ──
+
+
+def load_transaction_line_item_backfill(
+    filepath: str,
+    source: str = "playwright_backfill",
+    session_factory=None,
+) -> dict:
+    """
+    Load a Transaction Line Item Export CSV into the daily_item_export table.
+
+    Maps the different column names to the daily_item_export schema.
+    Uses Ref Nbr as item_ref for dedup. Fields not present in Transaction
+    Line Item (city, state, settle_status, etc.) are left as NULL.
+
+    Use this for historical backfills where Daily Item Export can't pull
+    custom date ranges. For daily going forward, use Daily Item Export.
+    """
+    if session_factory is None:
+        from app.db.session import SessionLocal
+        session_factory = SessionLocal
+
+    filename = os.path.basename(filepath)
+
+    with session_factory() as db:
+        load_entry = ReportLoad(
+            report_type="daily_item_export",
+            source=source,
+            source_file=filename,
+            rows_loaded=0,
+        )
+        db.add(load_entry)
+        db.flush()
+        load_id = load_entry.id
+
+        with open(filepath, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        loaded = 0
+        skipped = 0
+        for row in rows:
+            ref = row.get("Ref Nbr", "").strip()
+            if not ref:
+                continue
+            exists = db.query(DailyItemExport).filter_by(item_ref=ref).first()
+            if exists:
+                skipped += 1
+                continue
+
+            # Combine Tran Date + Tran Time into a datetime
+            tran_date = row.get("Tran Date", "").strip()
+            tran_time = row.get("Tran Time", "").strip()
+            item_date = None
+            if tran_date and tran_time:
+                try:
+                    item_date = datetime.strptime(f"{tran_date} {tran_time}", "%m/%d/%Y %H:%M:%S")
+                except ValueError:
+                    item_date = parse_date(tran_date)
+
+            amount = float(row["Tran Amount"]) if row.get("Tran Amount") else None
+            price = float(row["Line Item Price"]) if row.get("Line Item Price") else None
+
+            db.add(DailyItemExport(
+                load_id=load_id,
+                item_ref=ref,
+                device=row.get("Device Serial Num", "").strip(),
+                item_type=row.get("Trans Type Code", "").strip() or None,
+                item_date=item_date,
+                card_number=row.get("Masked Card Number", "").strip() or None,
+                amount=amount,
+                slot_code=row.get("Item", "").strip() or None,
+                slot_price=price,
+                quantity=int(row["Quantity"]) if row.get("Quantity") else None,
+                card_id=row.get("Card Id", "").strip() or None,
+            ))
+            loaded += 1
+
+        load_entry.rows_loaded = loaded
+        db.commit()
+
+        return {"rows_loaded": loaded, "skipped": skipped}
+
+
 # ── CLI ──
 
 

@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.models.tables import Base
-from scraper.loader import parse_amount, parse_slot, parse_item_date, parse_date, load_csv
+from scraper.loader import parse_amount, parse_slot, parse_item_date, parse_date, load_csv, load_transaction_line_item_backfill
 
 
 def make_test_db():
@@ -274,3 +274,69 @@ def test_load_unknown_report_type():
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "Unknown report type" in str(e)
+
+
+# ── Transaction Line Item backfill tests ──
+
+TRANSACTION_LINE_ITEM_CSV = '''"Device Serial Num","Ref Nbr","Trans Type Code","Masked Card Number","Tran Amount","Item","Line Item Price","Line Item MDB Number","Quantity","Tran Date","Tran Time","Line Item Description","Card Id"
+"VK200044724","22093419881","R","481582******2942","3","0D07","3","3335","1","04/09/2026","09:41:04","0D07","2814844442"
+"VK200044724","22093561737","R","434256******8579","2","0D03","2","3331","1","04/09/2026","09:58:42","0D03","3182735164"
+"VK200044729","22093564628","R","434256******8579","2.5","0B06","2.5","2822","1","04/10/2026","09:59:11","0B06","3182735164"
+'''
+
+
+def test_backfill_loads_into_daily_item_export():
+    """Transaction Line Item rows map into daily_item_export table."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "tli.csv", TRANSACTION_LINE_ITEM_CSV)
+        result = load_transaction_line_item_backfill(path, session_factory=Session)
+        assert result["rows_loaded"] == 3
+        assert result["skipped"] == 0
+
+
+def test_backfill_parsed_values():
+    """Verify backfill maps columns correctly to daily_item_export."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = write_csv(tmp, "tli.csv", TRANSACTION_LINE_ITEM_CSV)
+        load_transaction_line_item_backfill(path, session_factory=Session)
+
+        with Session() as s:
+            row = s.execute(
+                text("SELECT * FROM daily_item_export WHERE item_ref = '22093419881'")
+            ).fetchone()
+            assert row.device == "VK200044724"
+            assert row.slot_code == "0D07"
+            assert float(row.slot_price) == 3.0
+            assert float(row.amount) == 3.0
+            assert row.card_number == "481582******2942"
+            assert row.card_id == "2814844442"
+            assert row.quantity == 1
+            assert "2026" in str(row.item_date)
+            # Fields not in Transaction Line Item should be None
+            assert row.city is None
+            assert row.state is None
+            assert row.settle_status is None
+
+
+def test_backfill_dedup_against_existing():
+    """Backfill skips transactions already loaded via Daily Item Export."""
+    Session = make_test_db()
+    with tempfile.TemporaryDirectory() as tmp:
+        # First load some via Daily Item Export
+        daily_csv = '''"Device","Item Ref #","Customer Name","Location","Address Line 1","Address Line 2","City","State","Zip","Asset #","Item Type","Item Date","Card Number","Amount","Two-Tier Pricing","Column(s)","Quantity","Orig Ref #","Fee Rate","Settle Status","Payment #","Description","Card Id"
+"VK200044724","22093419881","Oscar M Arenas","Oscar M Arenas",,,"South Gate","CA","90280","TBD","CREDIT (EMV CONTACTLESS)","04/09/2026 09:41:04 AM","481582******2942","$3.00",,"0D07($3.00)",1,"","","SETTLED","","","2814844442"
+'''
+        path1 = write_csv(tmp, "daily.csv", daily_csv)
+        load_csv(path1, "daily_item_export", source="test", session_factory=Session)
+
+        # Now backfill with Transaction Line Item that overlaps
+        path2 = write_csv(tmp, "tli.csv", TRANSACTION_LINE_ITEM_CSV)
+        result = load_transaction_line_item_backfill(path2, session_factory=Session)
+        assert result["rows_loaded"] == 2  # 22093561737 and 22093564628
+        assert result["skipped"] == 1      # 22093419881 already exists
+
+        with Session() as s:
+            total = s.execute(text("SELECT COUNT(*) FROM daily_item_export")).scalar()
+            assert total == 3
