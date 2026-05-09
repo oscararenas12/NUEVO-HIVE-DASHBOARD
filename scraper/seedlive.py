@@ -191,28 +191,35 @@ def pull_transaction_line_item(page: Page, start: str, end: str):
     url = (
         "https://seedlive.com/select_date_range_frame_sqlfolio.i"
         "?basicReportId=481&reportTitle=Transaction+Line+Item+Export"
-        "&profileId=165351"
+        "&profileId=165351&outputType=21"
     )
-    page.goto(url, wait_until="networkidle")
-    time.sleep(1)
+    page.goto(url, wait_until="domcontentloaded")
+    time.sleep(3)
+
+    # This page may use frames — check for them
+    frame = page.main_frame
+    for f in page.frames:
+        if f != page.main_frame:
+            frame = f
+            break
 
     for selector in ["input[name='params.StartDate']", "#startDateId", "input[name='StartDate']"]:
-        el = page.query_selector(selector)
+        el = frame.query_selector(selector)
         if el:
             el.fill(start)
             break
     for selector in ["input[name='params.EndDate']", "#endDateId", "input[name='EndDate']"]:
-        el = page.query_selector(selector)
+        el = frame.query_selector(selector)
         if el:
             el.fill(end)
             break
 
     time.sleep(0.5)
-    submit = page.query_selector("input[value='Run Report'], input[name='Submit']")
+    submit = frame.query_selector("input[value='Run Report'], input[name='Submit']")
     if submit:
         submit.click()
-        page.wait_for_load_state("networkidle", timeout=15000)
-        time.sleep(2)
+        page.wait_for_load_state("domcontentloaded", timeout=30000)
+        time.sleep(3)
 
 
 REPORTS = {
