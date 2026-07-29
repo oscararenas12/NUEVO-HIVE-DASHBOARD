@@ -1,19 +1,31 @@
+# NUEVO-HIVE-DASHBOARD
 
-# 🐝 NUEVO-HIVE-DASHBOARD
+Vending machine CRM and sales dashboard. Tracks daily sales, slot performance, inventory, and customer refunds for drink and snack vending machines.
 
-**NUEVO-HIVE-DASHBOARD** is a web dashboard that helps vending operators track **daily sales**, **slot activity**, and **inventory status** in a clear, visual format.  
-It is designed for both **Drink** and **Snack** vending machines, turning raw CSV sales data into **interactive charts** and **slot-level analytics**.
+## Quick Start
 
----
+```bash
+docker-compose up -d --build
+```
 
-## 🚀 Overview
+- Frontend: http://localhost:3007
+- API: http://localhost:5001
+- API Docs (Swagger): http://localhost:5001/docs
 
-This app simplifies vending management by combining your **daily CSV sales exports** into a unified dashboard.  
-You’ll be able to **log in**, **upload sales data**, and **instantly visualize**:
+## Project Structure
 
-- Daily and total revenue  
-- Slot-level sales performance  
-- Empty or inactive slots (based on no activity over time)  
-- Long-term sales trends (weekly/monthly overview)
+See [docs/STRUCTURE.md](docs/STRUCTURE.md) for full layout.
 
-The goal is to give a **clean, visual snapshot** of vending operations, making restocking and performance tracking effortless.
+| Service | Description | Owner |
+|---------|-------------|-------|
+| services/client | React (TypeScript) frontend | Oscar |
+| services/api | FastAPI backend | Warrsia |
+| services/nginx | Reverse proxy | Shared |
+| scraper/ | SeedLive data pipeline (paused) | Oscar |
+
+## Documentation
+
+- [STACK.md](docs/STACK.md) - Tech stack and key decisions
+- [RULES.md](docs/RULES.md) - Development practices and workflow
+- [STRUCTURE.md](docs/STRUCTURE.md) - File structure and ownership
+- [plans/](docs/plans/) - Implementation plans

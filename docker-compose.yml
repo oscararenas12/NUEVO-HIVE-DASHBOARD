@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/api:/usr/src/app
+    ports:
+      - "5001:5000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@api-db:5432/hive_dev
+    depends_on:
+      - api-db
+
+  api-db:
+    image: postgres:16
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=hive_dev
+    ports:
+      - "5436:5432"
+
+  client:
+    build:
+      context: ./services/client
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/client:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "3007:3000"
+    environment:
+      - VITE_API_SERVICE_URL=http://localhost:5001
+
+  nginx:
+    build:
+      context: ./services/nginx
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - client
+
+volumes:
+  postgres_data:
