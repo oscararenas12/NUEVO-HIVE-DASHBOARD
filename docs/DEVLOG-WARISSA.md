@@ -49,3 +49,53 @@ both with a clean env and with a simulated CI env — 7/7 pass in both.
 
 Note: a cosmetic `StarletteDeprecationWarning` (httpx vs httpx2 in TestClient) shows up;
 it's a warning only, tests pass. Will revisit if it becomes an error on a future bump.
+
+---
+
+## 2026-08-07 | Warissa + Claude
+
+### Phase 1, Branch B: containerize the API (Dockerfile + entrypoint)
+
+Added the container half of Phase 1 on `feature/phase-1-docker`: `services/api/Dockerfile`
+and `services/api/entrypoint.sh`. The app from Branch A was unchanged.
+
+Decisions and reasoning:
+
+- **Base image: `python:3.12-slim`.** WHY: matches the Python 3.12 in STACK.md and keeps the
+  image small; psycopg2-binary ships as a wheel so no compiler/build tools are needed.
+
+- **Install `postgresql-client` in the image.** WHY: the entrypoint's DB-wait loop uses
+  `pg_isready`, which comes from that package. It's the readiness check the Phase 1 plan
+  called for.
+
+- **Entrypoint waits for Postgres before starting the API.** WHY: compose `depends_on` only
+  controls start *order*, not readiness — the API would otherwise race ahead of the DB. The
+  script loops on `pg_isready -h api-db -p 5432 -U postgres` (host/port/user overridable via
+  env) until it succeeds, then starts the server.
+
+- **Uvicorn listens on container port `5000`; compose maps it to host `5001`.** WHY: the
+  existing `docker-compose.yml` maps `5001:5000`, so the server must bind `--host 0.0.0.0
+  --port 5000`. From the host it's reached at `:5001` (matches the README/Swagger URLs).
+
+- **`--reload` for now.** WHY: compose bind-mounts `./services/api:/usr/src/app`, so live
+  code edits should hot-reload during development. A production/multi-stage image is a Phase 6
+  concern. Used the `exec` form so uvicorn becomes PID 1 and receives container signals.
+
+- **Alembic migrations intentionally omitted.** WHY: the Phase 1 plan text mentioned running
+  migrations in the entrypoint, but Alembic config and migrations don't exist until Phase 2 —
+  calling `alembic upgrade head` now would crash the container on startup. Left a comment in
+  the script noting Phase 2 adds it. Kept Branch B strictly to container infra.
+
+- **`docker-compose.yml` did NOT need changes.** WHY: its `api` service already had the right
+  build context, `Dockerfile` reference, bind mount, `5001:5000` mapping, `DATABASE_URL`, and
+  `depends_on: api-db`. Adding a DB healthcheck would be redundant with the entrypoint wait, so
+  I left compose alone. (Cosmetic aside: compose warns that the top-level `version:` key is
+  obsolete — noted, but out of scope for Branch B.)
+
+Verification (Docker Desktop running): image built successfully; `api` and `api-db` containers
+started; logs showed `Waiting for Postgres at api-db:5432... -> Postgres is ready.` then
+uvicorn on `0.0.0.0:5000` with the WatchFiles reloader. `GET /ping` returned
+`{"status":"ok","environment":"dev"}` (200), `/docs` served the Swagger UI (200), and
+`/openapi.json` exposed the `Nuevo Hive API` schema with the `/ping` path. All 7 Branch A
+tests passed inside the container (`docker compose exec api python -m pytest src/tests`).
+Containers were torn down cleanly afterward with `docker compose down`.
