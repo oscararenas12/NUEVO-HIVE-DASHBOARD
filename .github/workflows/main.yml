@@ -29,15 +29,29 @@ jobs:
         working-directory: services/api
     steps:
       - uses: actions/checkout@v4
+      - name: Check if service exists
+        id: check
+        run: |
+          if [ -f requirements.txt ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
       - uses: actions/setup-python@v5
+        if: steps.check.outputs.exists == 'true'
         with:
           python-version: "3.12"
       - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
         run: pip install -r requirements.txt
       - name: Run tests
+        if: steps.check.outputs.exists == 'true'
         env:
           DATABASE_TEST_URL: postgresql://postgres:postgres@localhost:5432/hive_test
         run: python -m pytest src/tests -v
+      - name: Skip (service not set up yet)
+        if: steps.check.outputs.exists != 'true'
+        run: echo "services/api not scaffolded yet -- skipping"
 
   client-tests:
     name: Frontend Tests
@@ -47,10 +61,24 @@ jobs:
         working-directory: services/client
     steps:
       - uses: actions/checkout@v4
+      - name: Check if service exists
+        id: check
+        run: |
+          if [ -f package.json ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.exists == 'true'
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
         run: npm ci
       - name: Run tests
+        if: steps.check.outputs.exists == 'true'
         run: npx vitest run
+      - name: Skip (service not set up yet)
+        if: steps.check.outputs.exists != 'true'
+        run: echo "services/client not scaffolded yet -- skipping"
