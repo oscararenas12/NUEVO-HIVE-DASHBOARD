@@ -1,0 +1,14 @@
+# Code Owners -- auto-assigns PR reviewers
+# When a PR touches these paths, the listed owner is requested for review
+
+# Frontend -- Oscar reviews
+/services/client/    @oscararenas12
+
+# Backend -- Warrsia reviews
+/services/api/       @warrsia
+
+# Shared -- both review
+/services/nginx/     @oscararenas12 @warrsia
+/docker-compose.yml  @oscararenas12 @warrsia
+/.github/            @oscararenas12 @warrsia
+/docs/               @oscararenas12 @warrsia

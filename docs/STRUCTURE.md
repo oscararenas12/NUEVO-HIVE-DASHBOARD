@@ -77,3 +77,36 @@ NUEVO-HIVE-DASHBOARD/
 | docs/ | Both | Shared knowledge base |
 | docker-compose.yml | Together | Container orchestration |
 | .github/workflows/ | Together | CI/CD pipeline |
+
+## Task Division
+
+### Oscar (Owner)
+- services/client/ -- React frontend, UI components, pages, routing
+- scraper/ -- SeedLive data pipeline (paused, will resume later)
+- Frontend testing (Vitest + React Testing Library)
+
+### Warrsia (Intern)
+- services/api/ -- FastAPI backend, SQLModel models, auth, API endpoints
+- services/api/src/db/ -- Database setup, migrations
+- Backend testing (pytest + FastAPI TestClient)
+- Reference: https://fastapi.tiangolo.com/tutorial/
+
+### Together
+- services/nginx/ -- Reverse proxy config
+- docker-compose.yml -- Container orchestration
+- .github/workflows/ -- CI/CD pipeline
+- Hosting setup and deployment
+- docs/ -- Shared knowledge base
+
+## Build Phases
+
+| Phase | What | Who | Depends On |
+|-------|------|-----|------------|
+| 1. Foundation | Clean repo, project structure, docs, CI/CD | Together | -- |
+| 2. Backend | FastAPI app, SQLModel, auth (signup/login/JWT), user roles, ping | Warrsia | Phase 1 |
+| 3. Frontend | Vite + React setup, Shadcn/ui, login page, dashboard layout, routing | Oscar | Phase 1 |
+| 4. Integration | Connect frontend to backend, auth flow end-to-end | Together | Phase 2 + 3 |
+| 5. Features | Refunds, dashboard views, data pipeline integration | Split | Phase 4 |
+| 6. Deploy | Docker production build, hosting, CI/CD finalize | Together | Phase 5 |
+
+Phase 2 and 3 run in parallel -- that's the point of the split.
