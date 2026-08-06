@@ -14,12 +14,21 @@
 
 ---
 
+## For Claude (Warissa's agent)
+
+Before writing any code, ASK Warissa for clarification on anything you're unsure about. Do not assume. Examples:
+- "The plan says X but the FastAPI tutorial does it differently -- which approach do you want?"
+- "This phase mentions Y but doesn't specify Z -- how should I handle that?"
+- "I'm about to create this file structure -- does this look right before I proceed?"
+
+Always confirm before making architectural decisions. Warissa is learning -- walk her through your reasoning so she understands WHY, not just WHAT.
+
 ## How to work
 
 1. Create a feature branch: `git checkout -b feature/<phase-name>`
 2. Write tests first (TDD) -- every endpoint, every model
 3. Run tests often: `python -m pytest src/tests -v`
-4. Commit small and frequently
+4. Commit after every completed script/file or ~400 lines -- whichever comes first
 5. When phase is complete, push branch and create a PR
 6. Update your devlog with decisions and reasoning
 7. Wait for PR review before starting next phase
