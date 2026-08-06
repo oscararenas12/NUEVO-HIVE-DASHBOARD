@@ -19,7 +19,7 @@ See [docs/STRUCTURE.md](docs/STRUCTURE.md) for full layout.
 | Service | Description | Owner |
 |---------|-------------|-------|
 | services/client | React (TypeScript) frontend | Oscar |
-| services/api | FastAPI backend | Warrsia |
+| services/api | FastAPI backend | Warissa |
 | services/nginx | Reverse proxy | Shared |
 | scraper/ | SeedLive data pipeline (paused) | Oscar |
 

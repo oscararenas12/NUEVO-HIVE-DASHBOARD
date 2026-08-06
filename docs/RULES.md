@@ -12,6 +12,8 @@
 - Branch naming: feature/<name>, fix/<name>
 - PR required for merge -- human reviews only
 - Keep commits small and focused
+- Commit after every completed script/file or every ~400 lines of code -- whichever comes first
+- Do NOT let work pile up without committing
 
 ## PR Process
 1. Developer creates feature branch
@@ -35,7 +37,7 @@
 ## Devlog
 - Each developer maintains their own devlog
   - Oscar: docs/DEVLOG-OSCAR.md
-  - Warrsia: docs/DEVLOG-WARRSIA.md
+  - Warissa: docs/DEVLOG-WARISSA.md
 - Agents write decisions and reasoning after every significant change
 - Format: date, who (human/agent), decision, reasoning
 - Check devlog after every pull from main / changes from other dev
