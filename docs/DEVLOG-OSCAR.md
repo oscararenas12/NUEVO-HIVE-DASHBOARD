@@ -18,3 +18,4 @@ Cleaned the repo and established the project structure. Key decisions:
 - Created docs/ as shared knowledge base with devlogs, rules, and plans.
 - All plans must be saved to docs/plans/ before implementation begins.
 - Warrsia (intern) uses default Claude -- no superpowers skills. Oscar uses Claude with superpowers plugin. Both agents should read docs/ for shared context.
+- RULES.md is a draft -- Oscar will refine and add more rules before development begins. Check for updates after every pull.

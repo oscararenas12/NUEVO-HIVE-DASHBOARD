@@ -1,4 +1,4 @@
-# Warrsia's Development Log
+# Warissa's Development Log
 
 Format: Date | Who (human/agent) | Decision + Reasoning
 
