@@ -99,3 +99,57 @@ uvicorn on `0.0.0.0:5000` with the WatchFiles reloader. `GET /ping` returned
 `/openapi.json` exposed the `Nuevo Hive API` schema with the `/ping` path. All 7 Branch A
 tests passed inside the container (`docker compose exec api python -m pytest src/tests`).
 Containers were torn down cleanly afterward with `docker compose down`.
+
+---
+
+## 2026-08-08 | Warissa + Claude
+
+### Phase 2, Branch A: User model + DB session + CRUD (feature/phase-2-models)
+
+Built the data layer that gives the API a persistent `users` table, tested against a real
+Postgres database. No Alembic and no endpoints yet -- migrations are Branch B, endpoints are
+Phase 3. Split Phase 2 the same way as Phase 1: Branch A = model/data logic + tests (turns CI
+green on its own), Branch B = schema/migration infra (needs Docker + Postgres to verify).
+
+Decisions and reasoning:
+
+- **Table named `users`, not `user`.** WHY: `user` is a reserved word in Postgres (`SELECT
+  user` returns the current role). SQLAlchemy would auto-quote it, but anything outside the
+  ORM (psql, raw SQL, hand-edited migrations) would have to remember the quotes -- a latent
+  foot-gun with no upside. Set `__tablename__ = "users"` explicitly; the Python class stays
+  the singular `User`.
+
+- **Test against real PostgreSQL, not SQLite in-memory.** WHY: our Phase 1 config + CI were
+  already built around a Postgres test DB (`DATABASE_TEST_URL`, `active_database_url`), and CI
+  already spins up Postgres 16. Testing on the real engine avoids the class of bug where
+  SQLite passes but Postgres fails (types, constraints, `server_default`). Cost: tests now
+  need a running Postgres. `conftest.py` reads `DATABASE_TEST_URL` (CI provides it; locally we
+  created a dedicated `hive_test` DB in the api-db container and export the 5436 URL).
+
+- **Per-test isolation via transaction rollback (commit-safe SAVEPOINT).** WHY: unlike a fresh
+  in-memory SQLite, a persistent Postgres DB keeps rows between tests. Because our
+  `create_user` commits, a plain outer-transaction rollback isn't enough -- so `conftest.py`
+  uses the SQLAlchemy "join an external transaction" recipe: bind the session to a connection
+  with an open transaction, run inside a SAVEPOINT, and restart the SAVEPOINT after each commit
+  via an `after_transaction_end` listener. Teardown rolls back the outer transaction, leaving
+  the DB pristine. This resolved cleanly, including the uniqueness tests that raise
+  `IntegrityError` -- no TRUNCATE fallback needed.
+
+- **`created_at`: database-side, timezone-aware.** WHY: `Column(DateTime(timezone=True),
+  server_default=func.now())` means every row's timestamp comes from one source (the DB
+  clock), not from whichever app/container happens to insert it. Consequence: the value isn't
+  populated on the Python object until commit + `session.refresh()`, so `create_user` refreshes
+  before returning and the test asserts `created_at` after that.
+
+- **Function-based CRUD (`crud.py`), not a repository class.** WHY: it's the lightweight
+  version of the repository pattern -- one place that owns user reads/writes so endpoints never
+  touch the DB directly -- and it matches the plan and the FastAPI tutorial the project follows.
+
+Side effect noted: the Phase 1 `/ping` tests now pull in the `session` fixture transitively
+(via the `client` fixture), so they need Postgres up too. True in CI and locally; the endpoint
+behavior is unchanged.
+
+Verification: `pytest src/tests -v` against `localhost:5436/hive_test` -> 17 passed (10 new
+user tests + the 7 Phase 1 tests). Isolation confirmed by `test_get_all_users` expecting
+exactly 2 rows passing. Alembic migrations, the entrypoint auto-`upgrade`, and verifying the
+real `users` table in Postgres are Branch B.
