@@ -13,6 +13,9 @@ until pg_isready -h "$host" -p "$port" -U "$user" >/dev/null 2>&1; do
 done
 echo "Postgres is ready."
 
+echo "Running database migrations..."
+alembic upgrade head
+
 # exec so uvicorn becomes PID 1 and receives container signals.
 # --reload because compose bind-mounts the source for live editing.
 exec uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload

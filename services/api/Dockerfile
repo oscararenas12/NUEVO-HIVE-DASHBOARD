@@ -13,8 +13,10 @@ WORKDIR /usr/src/app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# App code + entrypoint (selective COPY keeps host .venv/caches out of the image).
+# App code, migrations, and entrypoint (selective COPY keeps host .venv/caches out).
 COPY src ./src
+COPY alembic.ini .
+COPY migrations ./migrations
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
