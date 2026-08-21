@@ -74,3 +74,48 @@ Decisions and reasoning:
 Verification: `npx vitest run` passes 2 tests (App renders, heading visible). Vite dev server
 starts and serves at localhost:3007. Docker Desktop not running during this session — Dockerfile
 verified structurally but not built yet. Will test with `docker compose up client` next session.
+
+---
+
+## 2026-08-21 | Oscar + Claude
+
+### Phase 2: Layout + Routing
+
+Added sidebar layout, page routing, and NuevoHive branding. TDD — all 13 tests written before
+any component code.
+
+Decisions and reasoning:
+
+- **React Router v7 with nested routes.** WHY: Layout wraps dashboard pages via `<Outlet />`,
+  Login sits outside the layout (no sidebar on login). Nested routes keep the sidebar persistent
+  across page navigation without re-rendering it.
+
+- **MemoryRouter in tests, BrowserRouter in app.** WHY: MemoryRouter doesn't touch the URL bar,
+  so tests stay isolated. BrowserRouter in main.tsx for real navigation. Test utils wrapper
+  auto-wraps every component test with MemoryRouter + configurable initialEntries.
+
+- **Sidebar: fixed 260px, collapses on mobile.** WHY: 260px fits 3 nav links comfortably without
+  wasting space. On screens < lg (1024px), sidebar slides in/out with a hamburger toggle and a
+  backdrop overlay. Uses translate-x transition for smooth animation.
+
+- **NavLink with active state via className callback.** WHY: React Router's `NavLink` gives an
+  `isActive` boolean in its className function. Active link gets `bg-bg-surface text-white`,
+  inactive gets `text-gray-400` with hover state. `end` prop on the "/" route prevents it from
+  matching all paths.
+
+- **Lucide icons in nav.** WHY: already installed with Shadcn/ui (lucide-react). LayoutDashboard
+  for Overview, Grid3X3 for Slot Performance, TrendingUp for Trends. Consistent 16px size.
+
+- **Logo extraction with Pillow flood fill.** WHY: the original FullLogo.jpg had a white
+  background. Simple threshold-based removal also deleted the white band inside the hexagon.
+  Used BFS flood fill from image edges to only remove background white, preserving the logo's
+  internal white. Extracted the hexagon icon by finding the pixel-count gap between the hexagon
+  and the "NUEVOHIVE" text.
+
+- **Placeholder pages (Overview, SlotPerformance, Trends, Login).** WHY: Phase 2 is the skeleton.
+  Each page just renders its heading — real content comes in Phase 4 (dashboard components with
+  mock data). Login placeholder will be replaced in Phase 3 (auth UI).
+
+Verification: `npx vitest run` passes 13 tests across 7 files. Dev server at localhost:3000
+shows sidebar with logo + nav links, clicking links switches pages, mobile hamburger works.
+`docker compose up client` verified in Phase 1.
