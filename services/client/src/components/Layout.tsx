@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import NavBar from './NavBar'
+import logoIcon from '@/assets/logo-icon.png'
 
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -23,7 +24,10 @@ function Layout() {
         } flex`}
       >
         <div className="flex h-14 items-center justify-between px-4">
-          <span className="text-lg font-bold text-white">Nuevo Hive</span>
+          <div className="flex items-center gap-2">
+            <img src={logoIcon} alt="Nuevo Hive" className="h-8 w-auto" />
+            <span className="text-lg font-bold text-white">Nuevo Hive</span>
+          </div>
           <button
             className="text-gray-400 hover:text-white lg:hidden"
             onClick={() => setSidebarOpen(false)}
