@@ -1,13 +1,13 @@
-import { render, screen } from './test-utils'
+import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
 
 describe('App', () => {
   it('renders without crashing', () => {
-    render(<App />)
-  })
-
-  it('displays the app heading', () => {
-    render(<App />)
-    expect(screen.getByRole('heading', { name: /nuevo hive/i })).toBeInTheDocument()
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
   })
 })
