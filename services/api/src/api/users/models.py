@@ -21,3 +21,22 @@ class User(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
     )
+
+
+class UserCreate(SQLModel):
+    """Registration input (plain password, never stored as-is)."""
+
+    username: str
+    email: str
+    password: str
+
+
+class UserRead(SQLModel):
+    """Public user representation -- never includes password_hash."""
+
+    id: int
+    username: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime

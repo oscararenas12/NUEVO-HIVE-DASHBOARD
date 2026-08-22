@@ -27,3 +27,13 @@ def get_user_by_email(session: Session, email: str) -> User | None:
 
 def get_all_users(session: Session) -> list[User]:
     return list(session.exec(select(User)).all())
+
+
+def authenticate_user(session: Session, email: str, password: str) -> User | None:
+    """Return the user if the email exists and the password matches, else None."""
+    from src.api.security import verify_password
+
+    user = get_user_by_email(session, email)
+    if user is None or not verify_password(password, user.password_hash):
+        return None
+    return user
