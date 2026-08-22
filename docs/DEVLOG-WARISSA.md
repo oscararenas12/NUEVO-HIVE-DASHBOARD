@@ -214,3 +214,53 @@ users` showed the table with both unique indexes and `created_at timestamptz def
 `alembic_version` = `b97569d66aa5`. `/ping` and `/docs` returned 200; in-container pytest passed
 17 with the test-URL override. Stack torn down with `docker compose down` (Postgres volume
 preserved).
+
+---
+
+## 2026-08-22 | Warissa + Claude
+
+### Phase 3: Auth endpoints -- register, login, status (feature/phase-3-auth)
+
+Added authentication: `POST /auth/register`, `POST /auth/login`, `GET /auth/status` with bcrypt
+password hashing and JWT access tokens. Single branch (no A/B split) because **no migration was
+needed** -- the Phase 2 `User` model already had `password_hash`, `role`, and `is_active`, so this
+phase is pure app code.
+
+Decisions and reasoning:
+
+- **Login takes a JSON body `{email, password}`** (not the OAuth2 form). WHY: it's a clean JSON API
+  that matches Oscar's planned `login(email, password)` frontend call and needs no
+  `python-multipart`. We still use Bearer JWTs for `/auth/status` via `OAuth2PasswordBearer`, so
+  Swagger's Authorize button still works. This is the cross-team contract Oscar's Auth UI builds
+  against: register -> 201 `UserRead` (no password); login -> 200 `{access_token, token_type:
+  "bearer"}`; status -> 200 `UserRead`; bad creds/unknown email -> 401 "Invalid credentials".
+
+- **Hashing + JWT live in their own `src/api/security.py`**, not in `crud.py`. WHY: single
+  responsibility and easy to unit-test; keeps `auth.py` to just endpoints. `security.py` holds the
+  passlib `CryptContext`, `create_access_token`/decode, and the `get_current_user` dependency. Minor
+  deviation from the plan's literal "add hashing to crud.py", noted here.
+
+- **JWT secret from config with a dev default (`JWT_SECRET_KEY`), env-overridable.** WHY: mirrors
+  Phase 1's safe-default approach so tests/CI run with no setup. It MUST be overridden in production
+  (Phase 6). Made the dev default >=32 bytes after PyJWT warned that a 20-byte HS256 key is below the
+  recommended length.
+
+- **Pinned `bcrypt>=4.0,<4.1`.** WHY: passlib 1.7.4 reads `bcrypt.__about__.__version__`, which
+  bcrypt >=4.1 removed -- the pin avoids that break. Installed bcrypt 4.0.1.
+
+- **No secret ever leaves the API.** `response_model=UserRead` on register/status and a `UserCreate`
+  input schema guarantee `password_hash` is never returned and can't be set by the client. Register
+  catches `IntegrityError` (duplicate username/email) and returns 400 after a rollback.
+
+Implementation notes / issues:
+- Circular-import avoidance: `security.py` imports `crud`, so `crud.authenticate_user` imports
+  `verify_password` locally inside the function rather than at module top.
+- Two remaining test warnings are cosmetic and not worth fixing now: the Starlette/httpx TestClient
+  deprecation (seen since Phase 1) and passlib importing the stdlib `crypt` module (deprecated,
+  removed in Python 3.13 -- fine on our pinned Python 3.12; revisit if we bump Python).
+
+Verification: `pytest src/tests -v` against `localhost:5436/hive_test` -> 27 passed (10 new auth
+tests + the prior 17). Tests confirm register hides the password, duplicate email/username -> 400,
+missing fields -> 422, login returns a bearer token, wrong/unknown credentials -> 401, and
+`/auth/status` accepts a valid Bearer token while rejecting missing/malformed ones. Alembic
+untouched (no schema change).
