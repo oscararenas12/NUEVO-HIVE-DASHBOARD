@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     testing: bool = False
     environment: str = "dev"
 
+    # JWT settings. The secret has a dev default so tests/CI run without setup;
+    # it MUST be overridden via JWT_SECRET_KEY in production.
+    jwt_secret_key: str = "dev-only-insecure-secret-change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 15
+
     @property
     def active_database_url(self) -> str:
         """The DB URL to actually use: the test URL when testing, else primary."""
