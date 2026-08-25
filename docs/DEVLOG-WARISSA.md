@@ -306,3 +306,47 @@ user-mgmt tests + the prior 27). Tests cover auth-required listing, 404 on unkno
 403s for employees, self-deactivation 400, and that a soft-deleted user can no longer log in.
 Admin users in tests are inserted directly via the session fixture (register only creates
 employees). Alembic untouched.
+
+---
+
+## 2026-08-25 | Warissa + Claude
+
+### Phase 5: Refresh tokens + logout (feature/phase-5-refresh-logout)
+
+The last backend auth phase. Access tokens live 15 minutes; without a refresh flow the user is
+silently logged out that often. Added a 7-day refresh token (httpOnly cookie), `POST /auth/refresh`
+(mint a new access token from the cookie), and `POST /auth/logout` (clear it). Branched off a `main`
+that already had Phase 4 (PR #10 merged just before), so no coordination merge was needed. No
+migration -- tokens are stateless JWTs.
+
+Decisions and reasoning:
+
+- **Token kinds separated by a `type` claim (`"access"` vs `"refresh"`), not a second secret.**
+  WHY: the plan warned that an access and refresh token must not be interchangeable. A `type` claim
+  validated at decode achieves that with one secret and less config. `get_current_user` now requires
+  `type == "access"` and `/auth/refresh` requires `type == "refresh"`, so a refresh token can't be
+  used as a Bearer access token and vice versa (both tested).
+
+- **Refresh token delivered as an httpOnly cookie**, scoped to `path=/auth`, `samesite=lax`,
+  `max_age`=7 days, and **`secure` only when `environment == "production"`**. WHY: httpOnly keeps the
+  long-lived token out of reach of JS (XSS protection) -- the access token stays in the response body
+  for the SPA to hold in memory. `secure=False` in dev/test is required so the http TestClient
+  actually receives and returns the cookie; production flips it on. Scoping to `/auth` means the
+  cookie is only sent to auth routes.
+
+- **No refresh-token rotation** yet: `/auth/refresh` returns a new access token and leaves the
+  refresh cookie in place. WHY: matches the spec and keeps it simple; rotation + reuse-detection is a
+  future hardening.
+
+- **`logout` returns 200 `{"message": "logged out"}`** and deletes the cookie (must pass the same
+  `path=/auth` to clear it). Login's response body is unchanged, so all Phase 3 auth tests still hold.
+
+Known follow-up (frontend integration, with Oscar): a cross-origin SPA calling `/auth/refresh` will
+likely need `samesite=none` + `secure=true` + CORS `allow_credentials`. Deferred to the integration
+phase -- noted so it isn't a surprise.
+
+Verification: `pytest src/tests -v` against `localhost:5436/hive_test` -> 47 passed (7 new + the
+prior 40). New tests cover: login sets an httpOnly refresh cookie; refresh returns a new access
+token; missing/expired/wrong-type refresh -> 401; logout clears the cookie and blocks a subsequent
+refresh; a refresh token rejected as a Bearer access token. Expired-token test mints a JWT with a
+past `exp` and sets it via the test client's cookie jar. Alembic untouched.
