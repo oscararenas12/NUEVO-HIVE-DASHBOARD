@@ -1,6 +1,7 @@
 """User database model."""
 
 from datetime import datetime
+from typing import Literal
 
 from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, SQLModel
@@ -40,3 +41,12 @@ class UserRead(SQLModel):
     role: str
     is_active: bool
     created_at: datetime
+
+
+class UserUpdate(SQLModel):
+    """Admin-editable fields; all optional (only provided fields are changed)."""
+
+    username: str | None = None
+    email: str | None = None
+    role: Literal["admin", "employee"] | None = None
+    is_active: bool | None = None

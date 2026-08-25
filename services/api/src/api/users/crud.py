@@ -30,10 +30,35 @@ def get_all_users(session: Session) -> list[User]:
 
 
 def authenticate_user(session: Session, email: str, password: str) -> User | None:
-    """Return the user if the email exists and the password matches, else None."""
+    """Return the user if active, the email exists, and the password matches; else None."""
     from src.api.security import verify_password
 
     user = get_user_by_email(session, email)
-    if user is None or not verify_password(password, user.password_hash):
+    if user is None or not user.is_active or not verify_password(password, user.password_hash):
         return None
+    return user
+
+
+def update_user(session: Session, user_id: int, data: dict) -> User | None:
+    """Apply the given fields to a user and return it, or None if not found."""
+    user = get_user_by_id(session, user_id)
+    if user is None:
+        return None
+    for key, value in data.items():
+        setattr(user, key, value)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def delete_user(session: Session, user_id: int) -> User | None:
+    """Soft-delete: set is_active False. Returns the user, or None if not found."""
+    user = get_user_by_id(session, user_id)
+    if user is None:
+        return None
+    user.is_active = False
+    session.add(user)
+    session.commit()
+    session.refresh(user)
     return user

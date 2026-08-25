@@ -264,3 +264,45 @@ tests + the prior 17). Tests confirm register hides the password, duplicate emai
 missing fields -> 422, login returns a bearer token, wrong/unknown credentials -> 401, and
 `/auth/status` accepts a valid Bearer token while rejecting missing/malformed ones. Alembic
 untouched (no schema change).
+
+---
+
+## 2026-08-24 | Warissa + Claude
+
+### Phase 4: User-management endpoints + admin roles (feature/phase-4-user-management)
+
+Added `/users` endpoints: list + read for any authenticated user, update + deactivate for admins.
+Like Phase 3, **no migration** -- reuses the existing `role` and `is_active` columns -- so a single
+branch of pure app code.
+
+Decisions and reasoning:
+
+- **`admin_required` dependency layered on `get_current_user`.** WHY: `get_current_user` already
+  handles the 401 (missing/invalid token) and loads the active user, so `admin_required` just adds
+  the role check (403 if not admin). Composing the two gives the correct 401-vs-403 split for free:
+  no token -> 401, valid non-admin -> 403.
+
+- **PUT and DELETE are admin-only; GET list/read need any authenticated user.** WHY: matches the
+  spec's access model. Consequence/limitation: employees can't edit their own profile in this phase
+  -- self-service edits can come later.
+
+- **DELETE is a soft delete** (`is_active = False`), returning 200 + the updated `UserRead` (shows
+  `is_active:false`) instead of 204. WHY: soft delete preserves history/foreign keys, and returning
+  the record makes the outcome visible and easy to test.
+
+- **Admins can't deactivate themselves** (self -> 400) and **deactivated users can't log in.** WHY:
+  spec edge cases -- prevent an admin locking the system out of itself, and make deactivation
+  actually revoke access. The login guard went into `crud.authenticate_user` (returns None if not
+  active), which `login` already maps to 401. `get_current_user` also already rejected inactive
+  users, so an existing token stops working once the account is deactivated.
+
+- **`UserUpdate` uses `role: Literal["admin","employee"]`.** WHY: an invalid role becomes a clean
+  422 at validation time rather than silently writing a bad value (the DB column has no constraint).
+  Only provided fields are applied (`model_dump(exclude_unset=True)`). Duplicate username/email on
+  update is caught as `IntegrityError` -> 400. Password change is out of scope this phase.
+
+Verification: `pytest src/tests -v` against `localhost:5436/hive_test` -> 40 passed (13 new
+user-mgmt tests + the prior 27). Tests cover auth-required listing, 404 on unknown ids, admin-only
+403s for employees, self-deactivation 400, and that a soft-deleted user can no longer log in.
+Admin users in tests are inserted directly via the session fixture (register only creates
+employees). Alembic untouched.
