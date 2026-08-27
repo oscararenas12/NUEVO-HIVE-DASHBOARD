@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthContext'
 import logoIcon from '@/assets/logo-icon.png'
 
-function Login() {
-  const { login } = useAuth()
+function Register() {
+  const { register } = useAuth()
   const navigate = useNavigate()
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -16,10 +17,10 @@ function Login() {
     setError('')
     setSubmitting(true)
     try {
-      await login(email, password)
-      navigate('/', { replace: true })
+      await register(username, email, password)
+      navigate('/login')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
       setSubmitting(false)
     }
@@ -30,7 +31,7 @@ function Login() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
           <img src={logoIcon} alt="Nuevo Hive" className="h-10 w-auto" />
-          <h1 className="text-2xl font-semibold text-white">Sign in</h1>
+          <h1 className="text-2xl font-semibold text-white">Create account</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -39,6 +40,21 @@ function Login() {
               {error}
             </div>
           )}
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="username" className="text-sm font-medium text-gray-400">
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="rounded-lg border border-white/10 bg-bg-surface px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-accent focus:outline-none"
+              placeholder="alice"
+            />
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className="text-sm font-medium text-gray-400">
@@ -75,14 +91,14 @@ function Login() {
             disabled={submitting}
             className="mt-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-black transition-colors hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50"
           >
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-gray-500">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-accent hover:underline">
-            Create an account
+          Already have an account?{' '}
+          <Link to="/login" className="text-accent hover:underline">
+            Sign in
           </Link>
         </p>
       </div>
@@ -90,4 +106,4 @@ function Login() {
   )
 }
 
-export default Login
+export default Register
