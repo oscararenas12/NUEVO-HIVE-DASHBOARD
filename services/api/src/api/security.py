@@ -37,8 +37,29 @@ def create_access_token(user: User, settings: Settings) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    payload = {"sub": str(user.id), "role": user.role, "exp": expire}
+    payload = {"sub": str(user.id), "role": user.role, "type": "access", "exp": expire}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def create_refresh_token(user: User, settings: Settings) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(
+        days=settings.refresh_token_expire_days
+    )
+    payload = {"sub": str(user.id), "type": "refresh", "exp": expire}
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_refresh_token(token: str, settings: Settings) -> int:
+    """Return the user id from a valid refresh token, or raise 401."""
+    try:
+        payload = jwt.decode(
+            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+        )
+        if payload.get("type") != "refresh":
+            raise _credentials_exception
+        return int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
+        raise _credentials_exception
 
 
 def get_current_user(
@@ -50,6 +71,8 @@ def get_current_user(
         payload = jwt.decode(
             token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
+        if payload.get("type") != "access":
+            raise _credentials_exception
         user_id = int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise _credentials_exception
