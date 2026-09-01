@@ -11,7 +11,7 @@ def register_payload(**overrides):
     data = {
         "username": "alice",
         "email": "alice@example.com",
-        "password": "s3cret-pass",
+        "password": "Str0ng-Passw0rd!",
     }
     data.update(overrides)
     return data
@@ -51,12 +51,22 @@ def test_register_missing_fields_returns_422(client):
     assert resp.status_code == 422
 
 
+def test_register_short_password_returns_422(client):
+    resp = client.post("/auth/register", json=register_payload(password="short"))
+    assert resp.status_code == 422
+
+
+def test_register_invalid_email_returns_422(client):
+    resp = client.post("/auth/register", json=register_payload(email="not-an-email"))
+    assert resp.status_code == 422
+
+
 # ── login ──
 
 
 def test_login_valid_returns_token(client):
     client.post("/auth/register", json=register_payload())
-    resp = client.post("/auth/login", json={"email": "alice@example.com", "password": "s3cret-pass"})
+    resp = client.post("/auth/login", json={"email": "alice@example.com", "password": "Str0ng-Passw0rd!"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["access_token"]
@@ -79,7 +89,7 @@ def test_login_unknown_email_returns_401(client):
 
 def _register_and_token(client):
     client.post("/auth/register", json=register_payload())
-    resp = client.post("/auth/login", json={"email": "alice@example.com", "password": "s3cret-pass"})
+    resp = client.post("/auth/login", json={"email": "alice@example.com", "password": "Str0ng-Passw0rd!"})
     return resp.json()["access_token"]
 
 
@@ -108,7 +118,7 @@ def test_status_with_malformed_token_returns_401(client):
 def _login(client, **overrides):
     client.post("/auth/register", json=register_payload(**overrides))
     email = overrides.get("email", "alice@example.com")
-    password = overrides.get("password", "s3cret-pass")
+    password = overrides.get("password", "Str0ng-Passw0rd!")
     return client.post("/auth/login", json={"email": email, "password": password})
 
 
