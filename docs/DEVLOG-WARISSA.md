@@ -350,3 +350,45 @@ prior 40). New tests cover: login sets an httpOnly refresh cookie; refresh retur
 token; missing/expired/wrong-type refresh -> 401; logout clears the cookie and blocks a subsequent
 refresh; a refresh token rejected as a Bearer access token. Expired-token test mints a JWT with a
 past `exp` and sets it via the test client's cookie jar. Alembic untouched.
+
+---
+
+## 2026-09-01 | Warissa + Claude
+
+### Security remediation PR-A: auth & input hardening (feature/sec-auth-hardening)
+
+First of three grouped PRs remediating the pre-Phase-6 audit (see
+`docs/plans/2026-08-28-pre-phase-6-context.md`). PR-A covers SEC-001/002/003/005/006. No migration.
+
+Decisions and reasoning:
+
+- **SEC-001 — reject the default JWT secret in production.** WHY: the dev default is committed and
+  public; if a prod deploy forgot `JWT_SECRET_KEY`, anyone could forge admin tokens. Added a
+  pydantic `model_validator(mode="after")` on `Settings`: if `environment == "production"` and the
+  secret equals the `DEV_JWT_SECRET` constant, it raises → the app fails fast at startup
+  (`get_settings()` runs at import). Dev/test (default `environment=dev`) are unaffected.
+
+- **SEC-002/003 — input validation.** WHY: previously any password (even empty) and any string as
+  email were accepted. `UserCreate.password` now uses `Field(min_length=12)` and `email` uses
+  `EmailStr` (added the `email-validator` dep); `UserUpdate.email` too. Bad input → 422 automatically.
+  The `User` table column stays `str` (only the input schemas validate). Existing test fixtures were
+  bumped to >=12-char passwords.
+
+- **SEC-005 — reduce account enumeration.** WHY: login was faster for a non-existent email (it
+  returned before running bcrypt), a timing side-channel. `authenticate_user` now always runs a
+  bcrypt verify -- against a cached dummy hash when the user is missing/inactive -- so timing is
+  even. Register's duplicate error is now generic ("Could not complete registration") so it doesn't
+  say which field collided. KNOWN residual: register still returns 400 vs 201, so the status code
+  alone can confirm an account exists; fully closing that needs a "return 201 + notify by email"
+  flow (a feature, deferred). The login timing channel -- the more attackable one -- is closed.
+
+- **SEC-006 — /users is now fully admin-only.** WHY: RULES.md gives employees "scoped access", but
+  `GET /users` and `GET /users/{id}` only required being logged in, exposing the whole roster (and
+  who's admin) to any employee. Both now depend on `admin_required` (PUT/DELETE already did).
+  Employees get their own data from `GET /auth/status`. Chose full admin-only over self-or-admin for
+  simplicity; tests updated so employees get 403 and admins 200/404.
+
+Verification: `pytest src/tests -v` against `localhost:5436/hive_test` -> 54 passed (5 new/changed
+behaviors + the prior 49). Confirmed: prod+default-secret raises; <12-char password and invalid
+email -> 422; employee -> 403 on /users list/get, admin -> 200/404. Rate limiting, CORS/headers, and
+DB-cred env-ization are PR-B and PR-C.
