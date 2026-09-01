@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
+from pydantic import EmailStr
 from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, SQLModel
 
@@ -28,8 +29,8 @@ class UserCreate(SQLModel):
     """Registration input (plain password, never stored as-is)."""
 
     username: str
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=12)
 
 
 class UserRead(SQLModel):
@@ -47,6 +48,6 @@ class UserUpdate(SQLModel):
     """Admin-editable fields; all optional (only provided fields are changed)."""
 
     username: str | None = None
-    email: str | None = None
+    email: EmailStr | None = None
     role: Literal["admin", "employee"] | None = None
     is_active: bool | None = None

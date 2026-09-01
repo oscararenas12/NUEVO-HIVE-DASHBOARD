@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
-from src.api.security import admin_required, get_current_user
+from src.api.security import admin_required
 from src.api.users import crud
 from src.api.users.models import User, UserRead, UserUpdate
 from src.db import get_session
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("", response_model=list[UserRead])
 def list_users(
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(admin_required),
 ) -> list[User]:
     return crud.get_all_users(session)
 
@@ -24,7 +24,7 @@ def list_users(
 def get_user(
     user_id: int,
     session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
+    _: User = Depends(admin_required),
 ) -> User:
     user = crud.get_user_by_id(session, user_id)
     if user is None:

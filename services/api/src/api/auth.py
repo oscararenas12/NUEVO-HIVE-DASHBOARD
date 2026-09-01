@@ -57,7 +57,8 @@ def register(payload: UserCreate, session: Session = Depends(get_session)) -> Us
         return crud.create_user(session, user)
     except IntegrityError:
         session.rollback()
-        raise HTTPException(status_code=400, detail="Username or email already registered")
+        # Generic message so the response doesn't confirm which field already exists.
+        raise HTTPException(status_code=400, detail="Could not complete registration")
 
 
 @router.post("/login", response_model=Token)

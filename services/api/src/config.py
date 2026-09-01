@@ -7,7 +7,11 @@ See https://fastapi.tiangolo.com/advanced/settings/
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The committed dev default; production must override JWT_SECRET_KEY (see validator).
+DEV_JWT_SECRET = "dev-only-insecure-secret-change-me-in-production"
 
 
 class Settings(BaseSettings):
@@ -27,10 +31,19 @@ class Settings(BaseSettings):
 
     # JWT settings. The secret has a dev default so tests/CI run without setup;
     # it MUST be overridden via JWT_SECRET_KEY in production.
-    jwt_secret_key: str = "dev-only-insecure-secret-change-me-in-production"
+    jwt_secret_key: str = DEV_JWT_SECRET
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+
+    @model_validator(mode="after")
+    def _require_real_secret_in_production(self) -> "Settings":
+        if self.environment == "production" and self.jwt_secret_key == DEV_JWT_SECRET:
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a real value in production "
+                "(the dev default is not allowed)."
+            )
+        return self
 
     @property
     def active_database_url(self) -> str:
