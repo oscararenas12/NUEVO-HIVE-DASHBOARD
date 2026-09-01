@@ -6,6 +6,7 @@ DATABASE_TEST_URL). Each test then supplies exactly the values it cares about.
 """
 
 import pytest
+from pydantic import ValidationError
 
 from src.config import Settings
 
@@ -41,3 +42,25 @@ def test_non_testing_uses_primary_database():
 def test_testing_without_test_url_falls_back_to_primary():
     settings = Settings(testing=True, database_url="postgresql://primary")
     assert settings.active_database_url == "postgresql://primary"
+
+
+def test_production_with_default_jwt_secret_is_rejected():
+    """Fail fast: production must not run on the committed dev secret."""
+    with pytest.raises(ValidationError):
+        Settings(
+            environment="production",
+            jwt_secret_key="dev-only-insecure-secret-change-me-in-production",
+        )
+
+
+def test_production_with_custom_jwt_secret_is_allowed():
+    settings = Settings(
+        environment="production",
+        jwt_secret_key="a-sufficiently-long-real-production-secret-value",
+    )
+    assert settings.environment == "production"
+
+
+def test_dev_with_default_jwt_secret_is_allowed():
+    # The default is fine in dev/test -- only production is guarded.
+    assert Settings(environment="dev").environment == "dev"

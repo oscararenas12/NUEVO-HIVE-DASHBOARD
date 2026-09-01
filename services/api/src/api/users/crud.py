@@ -29,12 +29,32 @@ def get_all_users(session: Session) -> list[User]:
     return list(session.exec(select(User)).all())
 
 
+_dummy_hash: str | None = None
+
+
+def _get_dummy_hash() -> str:
+    """A cached bcrypt hash used to equalize timing when a user is missing."""
+    global _dummy_hash
+    if _dummy_hash is None:
+        from src.api.security import hash_password
+
+        _dummy_hash = hash_password("constant-time-dummy-password")
+    return _dummy_hash
+
+
 def authenticate_user(session: Session, email: str, password: str) -> User | None:
-    """Return the user if active, the email exists, and the password matches; else None."""
+    """Return the user if active, the email exists, and the password matches; else None.
+
+    Runs a bcrypt verify even when the user is missing/inactive so response timing
+    does not reveal whether an account exists (SEC-005).
+    """
     from src.api.security import verify_password
 
     user = get_user_by_email(session, email)
-    if user is None or not user.is_active or not verify_password(password, user.password_hash):
+    if user is None or not user.is_active:
+        verify_password(password, _get_dummy_hash())
+        return None
+    if not verify_password(password, user.password_hash):
         return None
     return user
 
