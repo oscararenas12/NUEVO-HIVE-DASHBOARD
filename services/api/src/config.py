@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
+    # Browser origins allowed to call the API (the SPA in dev). Env override
+    # (CORS_ORIGINS) must be JSON, e.g. '["https://app.example.com"]'.
+    cors_origins: list[str] = ["http://localhost:3007"]
+    # Rate limiting is on by default; the test suite disables it via env.
+    rate_limit_enabled: bool = True
+
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> "Settings":
         if self.environment == "production" and self.jwt_secret_key == DEV_JWT_SECRET:
