@@ -392,3 +392,46 @@ Verification: `pytest src/tests -v` against `localhost:5436/hive_test` -> 54 pas
 behaviors + the prior 49). Confirmed: prod+default-secret raises; <12-char password and invalid
 email -> 422; employee -> 403 on /users list/get, admin -> 200/404. Rate limiting, CORS/headers, and
 DB-cred env-ization are PR-B and PR-C.
+
+---
+
+## 2026-09-03 | Warissa + Claude
+
+### Security remediation PR-B: edge hardening + rate limiting (feature/sec-edge-hardening)
+
+Second of three remediation PRs. Covers SEC-004/007/009 (and documents SEC-008). No migration.
+
+Decisions and reasoning:
+
+- **App factory (`create_app(settings)`).** WHY: several of these need per-environment behavior
+  (prod vs dev) and testability. Refactored `main.py` so `create_app` builds a fresh app from a
+  `Settings`; kept module-level `app = create_app()` so `conftest`'s `from src.main import app` is
+  unchanged. Tests can now build a production-configured app to assert prod-only behavior.
+
+- **SEC-009 CORS + security headers.** WHY: browsers need an explicit allow-list to call the API
+  cross-origin, and responses should carry basic hardening headers. Added `CORSMiddleware`
+  (origins from `settings.cors_origins`, default the SPA dev origin `http://localhost:3007`,
+  `allow_credentials=True`) and an HTTP middleware setting `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, plus HSTS in production.
+
+- **SEC-007 disable docs in production.** WHY: Swagger/OpenAPI shouldn't be public in prod.
+  `create_app` sets `docs_url/redoc_url/openapi_url` to `None` when `environment == "production"`;
+  dev/test keep them. (Cookie `secure`-in-prod was already correct from Phase 5.)
+
+- **SEC-004 rate limiting on login.** WHY: throttle online password guessing. Used `slowapi` with a
+  shared module-level `Limiter` (`src/api/limiter.py`) so the `@limiter.limit("5/minute")` decorator
+  on `POST /auth/login` and `app.state.limiter` share one instance. Scope note: applied to **login
+  only** this PR (the brute-force target); `register`/`refresh` limits are a cheap follow-up.
+  Storage is in-memory -- fine for single-worker dev; a multi-worker prod deploy should use a shared
+  backend (e.g. Redis). **Test interaction:** the suite logs in many times from one client IP, so a
+  live limiter would cause cascading 429s -- `conftest` forces `RATE_LIMIT_ENABLED=false` before the
+  app imports, and the one rate-limit test flips `limiter.enabled = True` itself.
+
+- **SEC-008 CSRF -- deliberately deferred.** WHY: its trigger is `samesite=none` cookies, which we
+  are NOT enabling yet (cross-origin cookie auth is Phase-6 integration). Cookie stays `samesite=lax`
+  (already CSRF-resistant for now). When the SPA moves cross-origin, add CSRF tokens/origin checks
+  alongside `samesite=none`.
+
+Verification: `pytest src/tests -v` -> 59 passed (5 new + prior 54). Confirmed security headers on
+`/ping`, CORS preflight echoes the allowed origin, a production `create_app` has `/docs`+openapi
+disabled, and login returns 429 within 6 rapid attempts. DB-cred env-ization is PR-C.
