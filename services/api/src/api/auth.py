@@ -1,9 +1,10 @@
 """Auth endpoints: register, login, status, refresh, logout."""
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel
 
+from src.api.limiter import limiter
 from src.api.security import (
     create_access_token,
     create_refresh_token,
@@ -62,7 +63,9 @@ def register(payload: UserCreate, session: Session = Depends(get_session)) -> Us
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 def login(
+    request: Request,
     payload: LoginRequest,
     response: Response,
     session: Session = Depends(get_session),

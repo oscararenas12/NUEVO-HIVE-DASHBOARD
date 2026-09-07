@@ -9,8 +9,12 @@ SAVEPOINT.
 
 import os
 
-import pytest
-from fastapi.testclient import TestClient
+# Disable rate limiting for the suite BEFORE importing the app -- the limiter reads
+# this at import time. Individual tests re-enable it directly (see test_hardening.py).
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
