@@ -435,3 +435,41 @@ Decisions and reasoning:
 Verification: `pytest src/tests -v` -> 59 passed (5 new + prior 54). Confirmed security headers on
 `/ping`, CORS preflight echoes the allowed origin, a production `create_app` has `/docs`+openapi
 disabled, and login returns 429 within 6 rapid attempts. DB-cred env-ization is PR-C.
+
+---
+
+## 2026-09-08 | Warissa + Claude
+
+### Security remediation PR-C: DB credentials out of source (feature/sec-db-creds)
+
+Final remediation PR. Covers SEC-010, forward-only (no git history rewrite -- the old creds were
+throwaway local defaults, and rewriting shared `main` history is destructive).
+
+Decisions and reasoning:
+
+- **Credentials interpolated from a gitignored `.env`.** WHY: the committed `docker-compose.yml`
+  hardcoded `postgres/postgres`. It now uses `${POSTGRES_USER}/${POSTGRES_PASSWORD}/${POSTGRES_DB}`
+  and builds `DATABASE_URL` from them; compose auto-reads the project-root `.env` (already gitignored).
+  Added a committed `.env.example` with placeholders + the local `DATABASE_TEST_URL` note, so a new
+  dev copies it to `.env` and fills in values. No real creds are tracked going forward.
+
+- **Rotated the local dev creds** off `postgres/postgres` to a new user (`hive_app`) in `.env`.
+  WHY: the user asked for new creds. Postgres only applies `POSTGRES_*` on first volume init, so
+  verifying the new creds required recreating the `postgres_data` volume (`docker compose down -v`)
+  -- acceptable since it holds only throwaway dev/demo data. Confirmed the container then runs as
+  `hive_app` and the old `postgres` superuser is rejected.
+
+- **CI's test-DB creds left as-is.** WHY: the GitHub Actions Postgres service is ephemeral (exists
+  only during a run, never exposed), so its `postgres/postgres` is not a real secret; moving it to
+  Actions secrets would add ceremony for no security gain. Noted, not changed.
+
+- **conftest local test URL.** The suite reads `DATABASE_TEST_URL` from env; locally that now uses
+  the rotated creds (documented in `.env.example`). CI sets its own value. The committed conftest
+  fallback is a last-resort local convenience only.
+
+Verification: `docker compose config` resolves creds from `.env` (non-destructive); `.env` is
+gitignored and absent from `git status` while `.env.example` is tracked; the working
+`docker-compose.yml` contains no `postgres:postgres`. End-to-end: recreated the volume, brought up
+`api-db` (accepts `hive_app`, rejects old `postgres`), recreated `hive_test`, and ran the full suite
+against the rotated creds -> 59 passed. This completes the post-audit remediation (PR-A/B/C);
+SEC-011 and BUG-001/002 remain intentionally deferred.
