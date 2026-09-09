@@ -119,3 +119,93 @@ Decisions and reasoning:
 Verification: `npx vitest run` passes 13 tests across 7 files. Dev server at localhost:3000
 shows sidebar with logo + nav links, clicking links switches pages, mobile hamburger works.
 `docker compose up client` verified in Phase 1.
+
+---
+
+## 2026-08-22 | Oscar + Claude
+
+### Phase 2 polish: Apple-design refinements
+
+Applied apple-design skill to the Phase 2 skeleton. Cosmetic-only — no behavior changes.
+
+- **Translucent sidebar material** (`bg-sidebar` at 0.85 opacity + `backdrop-blur-xl`). WHY: gives
+  the sidebar depth without being opaque. Added `--color-sidebar: rgba(18,18,28,0.85)` to `@theme`.
+  Border thinned to `border-white/[0.06]`.
+
+- **Press feedback on interactive elements** (`active:scale-[0.97]` on nav links, `active:scale-90`
+  on mobile toggle buttons). WHY: apple-design §7 — tactile press feedback makes touch/click feel
+  responsive.
+
+- **Spring-like sidebar transition** (`ease-[cubic-bezier(0.25,1,0.5,1)] duration-300`). WHY: more
+  natural than linear — fast open, gentle settle.
+
+- **Mobile overlay fades** instead of popping (always in DOM, opacity transition + pointer-events
+  toggle). WHY: smoother than conditional render.
+
+- **Typography tightening**: tighter letter-spacing on h1/h2, `font-optical-sizing: auto`,
+  antialiased rendering, `font-semibold` over `font-bold`. NavBar `onNavigate` prop auto-closes
+  sidebar on mobile link tap.
+
+- **Reduced-motion media query** (§14): collapses all transitions/animations to 0.01ms.
+
+- **Page subtitles** added to Overview, SlotPerformance, Trends for context.
+
+Verification: `npx vitest run` passes 13 tests across 7 files. Visual check confirmed.
+
+---
+
+## 2026-09-08 | Oscar + Claude
+
+### Phase 3: Auth UI — login, register, protected routes
+
+Built the full auth UI layer with TDD. 23 new tests (36 total). Warissa's backend has register,
+login, status, refresh, and logout endpoints ready — no mocks needed for the API shapes.
+
+Decisions and reasoning:
+
+- **API client (`api/auth.ts`) uses fetch, not axios.** WHY: fetch is built-in, no extra dep.
+  `credentials: 'include'` on every call so httpOnly cookies (refresh token) are sent/received
+  automatically. A generic `handleResponse` function extracts `detail` from error JSON or falls back
+  to a default message.
+
+- **Access token stored in React state (AuthContext), NOT localStorage.** WHY: security requirement
+  from RULES.md and the backend design. The refresh token lives in an httpOnly cookie the browser
+  manages — JS never touches it.
+
+- **Silent refresh on mount.** WHY: when a user revisits the app, `AuthProvider` tries
+  `POST /auth/refresh`. If the cookie is valid, they're silently logged in without re-entering
+  credentials. If it fails (no cookie, expired), `isLoading` finishes and ProtectedRoute redirects
+  to `/login`.
+
+- **ProtectedRoute wraps the Layout route group, not individual pages.** WHY: one guard for all
+  dashboard pages. Login and Register sit outside the protected wrapper as public routes.
+
+- **Login and Register are plain forms (no form library).** WHY: two fields (login) or three fields
+  (register) don't warrant React Hook Form / Zod. Controlled inputs with `useState`, submit handler
+  calls `useAuth().login()` or `useAuth().register()`, errors displayed from the caught exception
+  message.
+
+- **Tests mock `useAuth` at the module level** (Login/Register tests) or mock `@/api/auth` (API
+  client and AuthContext tests). WHY: isolates the component under test from the network layer. API
+  client tests mock `globalThis.fetch`.
+
+Verification: `npx vitest run` passes 36 tests across 10 files.
+
+### Security alignment with Warissa's hardening PRs
+
+Reviewed Warissa's 3 security PRs (A: auth hardening, B: edge hardening, C: DB creds) and aligned
+the frontend:
+
+- **Password min 12 chars.** WHY: backend's `UserCreate.password` now has `min_length=12`.
+  Added `minLength={12}` to Register's password input and a hint ("Must be at least 12 characters").
+  Updated placeholders to 12 dots on both Login and Register.
+
+- **Generic register error message.** WHY: backend changed from "Username or email already
+  registered" to "Could not complete registration" to prevent account enumeration (SEC-005). Frontend
+  `handleResponse` already propagates whatever `detail` the backend sends, so no API client change
+  needed — only test assertions updated.
+
+- **All test passwords updated to 12+ chars.** WHY: consistency with the backend policy, even though
+  frontend tests mock the API. Keeps test data realistic.
+
+Verification: `npx vitest run` passes 36 tests across 10 files.
