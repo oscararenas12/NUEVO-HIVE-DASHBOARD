@@ -53,7 +53,7 @@ describe('AuthProvider', () => {
     const { result } = renderAuth()
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
-    await act(() => result.current.login('alice@example.com', 'pass'))
+    await act(() => result.current.login('alice@example.com', 's3cret!S3cur3'))
     expect(result.current.isAuthenticated).toBe(true)
     expect(result.current.user).toEqual(mockUser)
     expect(result.current.token).toBe('tok')
@@ -65,7 +65,7 @@ describe('AuthProvider', () => {
     const { result } = renderAuth()
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
-    await expect(act(() => result.current.login('a@b.com', 'wrong'))).rejects.toThrow(
+    await expect(act(() => result.current.login('a@b.com', 'wrongpass1234'))).rejects.toThrow(
       'Invalid credentials'
     )
     expect(result.current.isAuthenticated).toBe(false)
@@ -79,7 +79,7 @@ describe('AuthProvider', () => {
     const { result } = renderAuth()
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
-    await act(() => result.current.login('alice@example.com', 'pass'))
+    await act(() => result.current.login('alice@example.com', 's3cret!S3cur3'))
     expect(result.current.isAuthenticated).toBe(true)
 
     await act(() => result.current.logout())

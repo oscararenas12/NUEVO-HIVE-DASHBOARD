@@ -23,14 +23,14 @@ describe('login', () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({ access_token: 'tok123', token_type: 'bearer' })
     )
-    const result = await login('a@b.com', 'pass')
+    const result = await login('a@b.com', 's3cret!S3cur3')
     expect(result).toEqual({ access_token: 'tok123', token_type: 'bearer' })
     expect(mockFetch).toHaveBeenCalledWith(
       '/auth/login',
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
-        body: JSON.stringify({ email: 'a@b.com', password: 'pass' }),
+        body: JSON.stringify({ email: 'a@b.com', password: 's3cret!S3cur3' }),
       })
     )
   })
@@ -39,7 +39,7 @@ describe('login', () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({ detail: 'Invalid credentials' }, 401)
     )
-    await expect(login('a@b.com', 'wrong')).rejects.toThrow('Invalid credentials')
+    await expect(login('a@b.com', 'wrongpass1234')).rejects.toThrow('Invalid credentials')
   })
 })
 
@@ -47,23 +47,23 @@ describe('register', () => {
   it('posts registration data and returns user', async () => {
     const user = { id: 1, username: 'alice', email: 'a@b.com', role: 'employee', is_active: true, created_at: '2026-01-01T00:00:00Z' }
     mockFetch.mockResolvedValueOnce(jsonResponse(user, 201))
-    const result = await register('alice', 'a@b.com', 'pass')
+    const result = await register('alice', 'a@b.com', 's3cret!S3cur3')
     expect(result).toEqual(user)
     expect(mockFetch).toHaveBeenCalledWith(
       '/auth/register',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ username: 'alice', email: 'a@b.com', password: 'pass' }),
+        body: JSON.stringify({ username: 'alice', email: 'a@b.com', password: 's3cret!S3cur3' }),
       })
     )
   })
 
   it('throws on duplicate email', async () => {
     mockFetch.mockResolvedValueOnce(
-      jsonResponse({ detail: 'Username or email already registered' }, 400)
+      jsonResponse({ detail: 'Could not complete registration' }, 400)
     )
-    await expect(register('alice', 'dup@b.com', 'pass')).rejects.toThrow(
-      'Username or email already registered'
+    await expect(register('alice', 'dup@b.com', 's3cret!S3cur3')).rejects.toThrow(
+      'Could not complete registration'
     )
   })
 })

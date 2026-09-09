@@ -47,25 +47,25 @@ describe('Register', () => {
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/username/i), 'alice')
     await user.type(screen.getByLabelText(/email/i), 'alice@example.com')
-    await user.type(screen.getByLabelText(/password/i), 's3cret')
+    await user.type(screen.getByLabelText(/password/i), 's3cret!S3cur3')
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
-    expect(mockRegister).toHaveBeenCalledWith('alice', 'alice@example.com', 's3cret')
+    expect(mockRegister).toHaveBeenCalledWith('alice', 'alice@example.com', 's3cret!S3cur3')
     expect(mockNavigate).toHaveBeenCalledWith('/login')
   })
 
   it('shows error message on failed registration', async () => {
-    mockRegister.mockRejectedValueOnce(new Error('Username or email already registered'))
+    mockRegister.mockRejectedValueOnce(new Error('Could not complete registration'))
     render(<Register />)
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/username/i), 'alice')
     await user.type(screen.getByLabelText(/email/i), 'dup@example.com')
-    await user.type(screen.getByLabelText(/password/i), 's3cret')
+    await user.type(screen.getByLabelText(/password/i), 's3cret!S3cur3')
     await user.click(screen.getByRole('button', { name: /create account/i }))
 
     expect(
-      await screen.findByText('Username or email already registered')
+      await screen.findByText('Could not complete registration')
     ).toBeInTheDocument()
   })
 })

@@ -79,11 +79,13 @@ function Register() {
               id="password"
               type="password"
               required
+              minLength={12}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="rounded-lg border border-white/10 bg-bg-surface px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:border-accent focus:outline-none"
-              placeholder="••••••••"
+              placeholder="••••••••••••"
             />
+            <p className="text-xs text-gray-600">Must be at least 12 characters</p>
           </div>
 
           <button
