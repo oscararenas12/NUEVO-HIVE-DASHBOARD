@@ -7,6 +7,17 @@
   --color-accent: #ffa600;
   --color-accent-hover: #e69500;
   --color-sidebar: rgba(18, 18, 28, 0.85);
+  --color-positive: #34d399;
+  --color-negative: #f87171;
+  --color-heatmap-low: #1c1c29;
+  --color-heatmap-high: #ffa600;
+  --color-chart-1: #ffa600;
+  --color-chart-2: #ff6b35;
+  --color-chart-3: #4ecdc4;
+  --color-chart-4: #45b7d1;
+  --color-chart-5: #96ceb4;
+  --color-chart-6: #c792ea;
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 

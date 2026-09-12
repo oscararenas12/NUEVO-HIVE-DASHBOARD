@@ -209,3 +209,56 @@ the frontend:
   frontend tests mock the API. Keeps test data realistic.
 
 Verification: `npx vitest run` passes 36 tests across 10 files.
+
+---
+
+## 2026-09-12 | Oscar + Claude
+
+### Phase 4: Dashboard pages with mock data
+
+Built all dashboard components and assembled the three pages with realistic mock data. TDD throughout
+— 62 new tests (98 total). Installed recharts for charting, plus shadcn Card/Table/Badge/Tabs.
+
+Decisions and reasoning:
+
+- **Mock data shaped to match future API contracts.** WHY: the backend has no dashboard endpoints yet
+  (Warissa's Phase 6). Designed 4 endpoint interfaces (`getOverview`, `getDevices`, `getSlots`,
+  `getTrends`) based on the actual SeedLive CSV data shapes from `scraper/downloads/`. Uses real
+  machine serials (VK200044724, VK200044729), real slot codes (0B06, 0A06, etc.), and all 6 observed
+  payment types. When Warissa builds the endpoints, frontend just swaps mock for fetch — no component
+  changes needed.
+
+- **Mock vs fetch toggle via `VITE_API_URL`.** WHY: `api/dashboard.ts` checks if `API_BASE` is set.
+  Empty string (dev without backend) returns mock data immediately. Set URL returns real fetch. Same
+  pattern as the auth client — consistent, zero config for development.
+
+- **Recharts over custom SVG.** WHY: recharts provides `BarChart`, `AreaChart`, `LineChart`, `PieChart`
+  out of the box with responsive containers. All charts styled with dark theme (custom tooltip, grid,
+  axis colors matching our palette). Only exception: SlotMap heatmap is custom CSS Grid because
+  recharts has no heatmap component.
+
+- **Recharts mocked in tests.** WHY: recharts renders SVG internally which is brittle in jsdom.
+  Created `tests/__mocks__/recharts.tsx` that replaces chart components with `<div data-testid>`.
+  Tests verify the wrapper card renders and data passes through, not SVG internals.
+
+- **SlotMap uses CSS Grid with color interpolation.** WHY: the 6x8 heatmap grid needs per-cell
+  background colors proportional to revenue/maxRevenue. CSS Grid gives precise control. Color
+  interpolates from `bg-surface` (zero revenue) to accent amber (max revenue) via RGB math.
+
+- **New theme tokens for data visualization.** WHY: added `--color-positive` (emerald), `--color-negative`
+  (red), 6 chart colors for multi-series, heatmap gradient endpoints, and `--color-border-subtle`. Keeps
+  all colors in the CSS `@theme` block for consistency.
+
+- **Pages use `useState` + `useEffect`, no state library.** WHY: each page calls one or two mock API
+  functions on mount. Data is static mock — no caching, refetching, or invalidation needed. TanStack
+  Query can be added in Phase 5 (integration) if complexity warrants it.
+
+Components built (9 new): StatCard, RevenueChart, DailySales, DeviceBreakdown, RecentTransactions,
+SlotMap (CSS Grid heatmap), SlotRankings, PaymentTypes (donut chart), TrendCharts (4 sub-charts).
+
+Page layouts (responsive grid):
+- Overview: stat cards (4-col) → charts (2-col) → devices (1/3) + transactions (2/3)
+- SlotPerformance: device tabs → slot map (3/5) + rankings (2/5) → payment donut
+- Trends: weekly + monthly (2-col) → hourly + day-of-week (2-col)
+
+Verification: `npx vitest run` passes 98 tests across 20 files. `npx tsc --noEmit` clean.
