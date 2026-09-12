@@ -10,8 +10,8 @@ services:
     ports:
       - "5001:5000"
     environment:
-      # Credentials come from the (gitignored) .env file -- see .env.example.
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@api-db:5432/${POSTGRES_DB}
+      - CORS_ORIGINS=["http://localhost","http://localhost:3000","http://localhost:3007"]
     depends_on:
       - api-db
 
@@ -36,7 +36,7 @@ services:
     ports:
       - "3007:3000"
     environment:
-      - VITE_API_SERVICE_URL=http://localhost:5001
+      - VITE_API_URL=/api
 
   nginx:
     build:

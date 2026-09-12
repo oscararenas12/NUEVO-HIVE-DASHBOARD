@@ -262,3 +262,52 @@ Page layouts (responsive grid):
 - Trends: weekly + monthly (2-col) → hourly + day-of-week (2-col)
 
 Verification: `npx vitest run` passes 98 tests across 20 files. `npx tsc --noEmit` clean.
+
+---
+
+## 2026-09-12 | Oscar + Claude
+
+### Phase 5: Integration — auth flow + infrastructure
+
+Connected the frontend to the real backend auth system via Docker. Dashboard pages stay on mock data
+(graceful fallback) until Warissa builds data endpoints in Phase 6.
+
+Decisions and reasoning:
+
+- **Nginx reverse proxy over direct CORS.** WHY: same-origin architecture is fundamentally simpler.
+  The browser talks to one host (`http://localhost`), nginx routes `/api/*` to the FastAPI backend
+  and everything else to the Vite dev server. No CORS preflight requests, no cross-origin cookie
+  issues. Added defensive CORS origins in docker-compose anyway for direct-access scenarios.
+
+- **Cookie path rewrite in nginx (`proxy_cookie_path /auth /api/auth`).** WHY: the backend sets
+  `Set-Cookie: path=/auth` on login. With the `/api` prefix, the browser would send cookies to
+  `/auth/*` but the actual refresh endpoint is at `/api/auth/refresh` — path mismatch means the
+  cookie is never sent. The nginx directive rewrites the cookie path in the response header so the
+  browser stores it under `/api/auth` and sends it correctly.
+
+- **Vite dev proxy mirrors the nginx routing.** WHY: for local dev with a running backend (no Docker),
+  `server.proxy` in vite.config.ts forwards `/api/*` to `http://localhost:5001` with the same path
+  rewrite and cookie path fix. Developers get the same `/api` prefix behavior whether running via
+  Docker or locally.
+
+- **Dashboard API graceful fallback (try/catch → mock).** WHY: `VITE_API_URL=/api` is now set in
+  Docker mode, which means dashboard fetch calls will execute (not short-circuit to mock). Since
+  Warissa hasn't built `/dashboard/*` endpoints yet, those fetches 404. Wrapping in try/catch and
+  returning mock data on error prevents broken pages. When she builds the endpoints, the try branch
+  succeeds and mock data disappears — no frontend changes needed.
+
+- **`VITE_API_SERVICE_URL` → `VITE_API_URL` env var fix.** WHY: docker-compose set a var name the
+  frontend never read. Fixed to match what `api/auth.ts` and `api/dashboard.ts` actually import.
+  Value changed from `http://localhost:5001` (cross-origin) to `/api` (relative, same-origin via
+  nginx).
+
+- **Added `vite-env.d.ts`.** WHY: TypeScript needs a declaration for `import.meta.env.VITE_API_URL`.
+  Without it, the type is `any` and typos are silent. Now TypeScript knows the env var exists and
+  is optional.
+
+Files changed: nginx Dockerfile + conf, docker-compose.yml, vite.config.ts, vite-env.d.ts,
+dashboard.ts (fallback), .env.example, 4 new fallback tests.
+
+Verification: `npx vitest run` passes 102 tests across 21 files. `docker-compose up --build` starts
+all 4 services. Auth flow works end-to-end at `http://localhost`: register → login → dashboard
+(mock data) → logout → redirect to login.
