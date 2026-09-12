@@ -45,10 +45,10 @@ describe('Login', () => {
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/email/i), 'alice@example.com')
-    await user.type(screen.getByLabelText(/password/i), 's3cret')
+    await user.type(screen.getByLabelText(/password/i), 's3cret!S3cur3')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
-    expect(mockLogin).toHaveBeenCalledWith('alice@example.com', 's3cret')
+    expect(mockLogin).toHaveBeenCalledWith('alice@example.com', 's3cret!S3cur3')
     expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true })
   })
 
@@ -58,7 +58,7 @@ describe('Login', () => {
 
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/email/i), 'alice@example.com')
-    await user.type(screen.getByLabelText(/password/i), 'wrong')
+    await user.type(screen.getByLabelText(/password/i), 'wrongpass1234')
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(await screen.findByText('Invalid credentials')).toBeInTheDocument()
