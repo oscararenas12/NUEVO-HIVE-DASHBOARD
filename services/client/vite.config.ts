@@ -15,5 +15,13 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5001',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/api/, ''),
+        cookiePathRewrite: { '/auth': '/api/auth' },
+      },
+    },
   },
 })

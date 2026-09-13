@@ -241,24 +241,40 @@ async function handleResponse<T>(res: Response, fallback: string): Promise<T> {
 
 export async function getOverview(): Promise<OverviewResponse> {
   if (!API_BASE) return MOCK_OVERVIEW
-  const res = await fetch(`${API_BASE}/dashboard/overview`, { credentials: 'include' })
-  return handleResponse(res, 'Failed to load overview')
+  try {
+    const res = await fetch(`${API_BASE}/dashboard/overview`, { credentials: 'include' })
+    return await handleResponse(res, 'Failed to load overview')
+  } catch {
+    return MOCK_OVERVIEW
+  }
 }
 
 export async function getDevices(): Promise<DevicesResponse> {
   if (!API_BASE) return MOCK_DEVICES
-  const res = await fetch(`${API_BASE}/dashboard/devices`, { credentials: 'include' })
-  return handleResponse(res, 'Failed to load devices')
+  try {
+    const res = await fetch(`${API_BASE}/dashboard/devices`, { credentials: 'include' })
+    return await handleResponse(res, 'Failed to load devices')
+  } catch {
+    return MOCK_DEVICES
+  }
 }
 
 export async function getSlots(): Promise<SlotsResponse> {
   if (!API_BASE) return MOCK_SLOTS
-  const res = await fetch(`${API_BASE}/dashboard/slots`, { credentials: 'include' })
-  return handleResponse(res, 'Failed to load slots')
+  try {
+    const res = await fetch(`${API_BASE}/dashboard/slots`, { credentials: 'include' })
+    return await handleResponse(res, 'Failed to load slots')
+  } catch {
+    return MOCK_SLOTS
+  }
 }
 
 export async function getTrends(): Promise<TrendsResponse> {
   if (!API_BASE) return MOCK_TRENDS
-  const res = await fetch(`${API_BASE}/dashboard/trends`, { credentials: 'include' })
-  return handleResponse(res, 'Failed to load trends')
+  try {
+    const res = await fetch(`${API_BASE}/dashboard/trends`, { credentials: 'include' })
+    return await handleResponse(res, 'Failed to load trends')
+  } catch {
+    return MOCK_TRENDS
+  }
 }
